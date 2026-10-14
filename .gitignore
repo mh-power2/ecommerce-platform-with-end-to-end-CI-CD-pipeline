@@ -1,12 +1,27 @@
-target/
-node_modules/
-dist/
-.angular/
+
+# Java / Maven
+**/target/
+*.class
+
+# Node.js / Angular
+**/node_modules/
+**/dist/
+**/.angular/
+
+# IDE settings
 .vscode/
+**/.vscode/
 .idea/
+**/.idea/
+
+# Environment files and secrets
 .env
 .env.*
 !.env.example
 *.pem
 *.key
+
+# Logs and OS files
 *.log
+.DS_Store
+Thumbs.db
