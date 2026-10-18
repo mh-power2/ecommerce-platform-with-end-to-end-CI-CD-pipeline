@@ -1,0 +1,81 @@
+
+pipeline {
+    agent any
+
+    options {
+        disableConcurrentBuilds()
+        timestamps()
+    }
+
+    environment {
+        IMAGE_NAME = 'moha044/ecommerce-postgres'
+        DOCKERHUB_CREDENTIALS = 'dockerhub-creds'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Validate Database Files') {
+            steps {
+                sh '''
+                    set -eu
+                    test -f Database/Dockerfile
+                    test -f Database/init/001-create-schema.sql
+                    test -f Database/postgresql-init/01-init-database.sh
+                    echo "Database files found."
+                '''
+            }
+        }
+
+        stage('Build Image') {
+            steps {
+                script {
+                    env.IMAGE_TAG = "${env.BUILD_NUMBER}"
+                }
+                sh '''
+                    docker build \
+                      -t "$IMAGE_NAME:$IMAGE_TAG" \
+                      -t "$IMAGE_NAME:latest" \
+                      Database
+                '''
+            }
+        }
+
+        stage('Push Image to Docker Hub') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: "${DOCKERHUB_CREDENTIALS}",
+                        usernameVariable: 'DOCKERHUB_USER',
+                        passwordVariable: 'DOCKERHUB_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        printf '%s' "$DOCKERHUB_TOKEN" |
+                          docker login --username "$DOCKERHUB_USER" --password-stdin
+                        docker push "$IMAGE_NAME:$IMAGE_TAG"
+                        docker push "$IMAGE_NAME:latest"
+                        docker logout
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'docker image prune -f || true'
+        }
+        success {
+            echo 'Database image built and pushed successfully.'
+        }
+        failure {
+            echo 'Database image pipeline failed. Check the stage logs.'
+        }
+    }
+}
